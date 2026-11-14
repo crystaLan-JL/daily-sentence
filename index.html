@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="每日一句">
+<meta name="theme-color" content="#f3f5f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141a1f" media="(prefers-color-scheme: dark)">
+<title>每日一句 日语韩语</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=Noto+Serif+KR:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* layout: one narrow column, two sentence blocks; every character carries its reading above/below */
+:root{
+  --bg:#f3f5f4; --surface:#fbfcfb; --ink:#1c2630; --muted:#66727c; --line:#d5dbd9; --accent:#2f5d8a;
+  --display-ja:"Noto Serif JP","Hiragino Mincho ProN","Yu Mincho",serif;
+  --display-ko:"Noto Serif KR","Apple SD Gothic Neo","Malgun Gothic",serif;
+  --body:-apple-system,"PingFang SC","Hiragino Sans","Noto Sans SC","Microsoft YaHei",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#141a1f;--surface:#1b232a;--ink:#e4e9ec;--muted:#93a0a9;--line:#2e3942;--accent:#8ab4dc;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#141a1f;--surface:#1b232a;--ink:#e4e9ec;--muted:#93a0a9;--line:#2e3942;--accent:#8ab4dc;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.7}
+main{max-width:680px;margin:0 auto;padding:28px 20px 56px;display:flex;flex-direction:column;gap:28px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+h1{font-size:15px;font-weight:600;margin:0;letter-spacing:.08em}
+.date{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+.nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:14px}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button[disabled]{opacity:.4;cursor:default}
+section{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:24px 22px;display:flex;flex-direction:column;gap:16px}
+.lang{font-size:12px;letter-spacing:.14em;color:var(--accent);font-weight:600}
+.sent{margin:0;display:flex;flex-wrap:wrap;gap:10px 3px;align-items:flex-end}
+.tk{display:inline-flex;flex-direction:column;align-items:center;line-height:1.25}
+.tk b{font-weight:600;font-size:25px}
+.tk .k,.tk .ro{font-style:normal;font-family:var(--body);font-size:11px;color:var(--muted);min-height:14px;white-space:nowrap}
+.tk .ro{color:var(--accent)}
+.ja .tk b{font-family:var(--display-ja)} .ko .tk b{font-family:var(--display-ko)}
+.sm{gap:6px 2px}
+.sm .tk b{font-size:17px}
+.gap{width:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.note{font-size:13px;color:var(--muted)}
+.zh{margin:0;padding:10px 14px;border-left:3px solid var(--accent);background:var(--bg);border-radius:0 6px 6px 0}
+h2{font-size:13px;color:var(--muted);font-weight:600;margin:6px 0 0;letter-spacing:.06em}
+.words{display:grid;grid-template-columns:auto 1fr;gap:12px 20px;font-size:15px;align-items:center;margin:0}
+.words dt{margin:0} .words dd{margin:0}
+.gram{display:flex;flex-direction:column;gap:16px;font-size:15px}
+.gram .item{display:flex;flex-direction:column;gap:4px}
+.gram p{margin:0}
+.kr{font-style:normal;color:var(--accent);font-size:13px}
+rt{font-size:.6em;color:var(--muted)}
+footer{display:flex;flex-direction:column;gap:12px;color:var(--muted);font-size:14px}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.done{border-color:var(--accent);color:var(--accent)}
+@media (max-width:420px){.tk b{font-size:21px}.sm .tk b{font-size:16px}.words{grid-template-columns:1fr;gap:4px}.words dd{margin-bottom:10px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>每日一句</h1>
+  <div class="nav">
+    <button id="prev" aria-label="前一天">← 前一天</button>
+    <span class="date" id="date"></span>
+    <button id="next" aria-label="后一天">后一天 →</button>
+  </div>
+</header>
+<div id="cards" style="display:flex;flex-direction:column;gap:20px"></div>
+<footer>
+  <div class="foot"><span id="streak"></span><button id="mark">今天读完了</button></div>
+  <span>注音说明：日语上面是假名，下面是罗马音；助词は读 wa、を读 o。韩语的罗马音按实际读音标，前一个字的收音会连到后一个字上，比如 먹었어요 读作 meo-geo-sseo-yo。</span>
+</footer>
+</main>
+<script>
+/* [句子, 中文, [[单词, 释义]...], [[语法, 讲解]...]]  汉字{读法}；助词は写作 は{wa} */
+const JA_NEW=[
+["会{あ}いたいと思{おも}ったときには{wa}、もう歩{ある}き出{だ}していた。","想见你的念头刚起，脚已经迈出去了。",[["会{あ}う","见面"],["歩{ある}き出{だ}す","迈步走起来"]],[["～だす","ます形＋だす，「开始……起来」，带一点忽然的感觉。"],["～ときには{wa}","「等到……的时候，已经……」。"]]],
+["名前{なまえ}を呼{よ}ばれただけで、胸{むね}が少{すこ}し熱{あつ}くなる。","只是被叫了名字，胸口就微微发烫。",[["呼{よ}ぶ","叫、呼唤"],["胸{むね}","胸口、心里"]],[["～だけで","「仅仅……就……」。"],["～れる","被动：よぶ → よばれる，被叫。"]]],
+["夜{よる}が長{なが}いのは{wa}、きっと君{きみ}のことを考{かんが}えているせいだ。","夜这么长，一定是因为在想你。",[["きっと","一定"],["君{きみ}","你（亲近的称呼）"]],[["～のは{wa}～せいだ","「之所以……，是因为……」。せい通常带一点抱怨，这里是在撒娇地怪对方。"]]],
+["雪{ゆき}が降{ふ}ると、世界{せかい}が少{すこ}しだけ静{しず}かになる。","一下雪，世界就安静了一点点。",[["雪{ゆき}","雪"],["静{しず}か","安静"]],[["～と","辞书形＋と，「一……就……」，说的是每次都会这样的事。"]]],
+["言葉{ことば}にできない気持{きも}ちほど、長{なが}く残{のこ}る。","越是说不出口的心情，留得越久。",[["言葉{ことば}","语言、话"],["残{のこ}る","留下"]],[["～ほど","「越是……越……」。"],["～にできない","「没法变成……」。ことばにできない＝无法言说。"]]],
+["何{なに}も話{はな}さなくても、隣{となり}にいるだけでよかった。","什么都不说，只要在旁边就够了。",[["話{はな}す","说话"],["隣{となり}","旁边"]],[["～だけでいい","「只要……就好」。よかった是过去式，带着回想。"]]],
+["忘{わす}れたふりをするのが、だんだん上手{じょうず}になってきた。","假装忘记这件事，渐渐做得越来越好了。",[["だんだん","渐渐"],["上手{じょうず}","擅长"]],[["～ふりをする","た形＋ふりをする，「假装……」。"],["～てきた","变化一路到现在：「变得……了」。"]]],
+["春{はる}を待{ま}つ間{あいだ}に、少{すこ}しずつ強{つよ}くなればいい。","在等春天的日子里，一点点变强就好。",[["待{ま}つ","等"],["少{すこ}しずつ","一点一点地"]],[["～あいだに","「在……的期间里（做完某事）」。"]]],
+["君{きみ}が笑{わら}うたびに、今日{きょう}も悪{わる}くなかったと思{おも}える。","每次你一笑，就觉得今天也不坏。",[["笑{わら}う","笑"],["悪{わる}い","坏"]],[["～たびに","辞书形＋たびに，「每当……」。"],["おもえる","おもう的可能形：自然而然地这么觉得。"]]],
+["帰{かえ}り道{みち}の月{つき}が、やけにきれいに見{み}えた。","回家路上的月亮，不知怎么格外好看。",[["帰{かえ}り道{みち}","回去的路"],["月{つき}","月亮"]],[["やけに","口语副词，「莫名地、格外地」。"],["みえる","「看起来」，不是主动去看，是映入眼里。"]]],
+["さよならを言{い}うには{wa}、まだ早{はや}すぎる。","说再见，还太早了。",[["さよなら","再见"],["早{はや}い","早"]],[["～には{wa}","辞书形＋には，「要……的话」，后面接评价。"],["～すぎる","形容词去い＋すぎる，「太……」。"]]],
+["一人{ひとり}でいることと、寂{さび}しいことは{wa}、同{おな}じじゃない。","一个人待着，和寂寞，不是一回事。",[["一人{ひとり}","一个人"],["寂{さび}しい","寂寞"]],[["～ことと～ことは{wa}","用こと把两件事名词化后放在一起比较。"]]],
+["泣{な}きたいときは{wa}、泣{な}いたっていい。","想哭的时候，哭也没关系。",[["泣{な}く","哭"],["とき","时候"]],[["～たっていい","「～てもいい」的口语说法，更软、更亲近。"]]],
+["あの日{ひ}の匂{にお}いを、今{いま}でもふと思{おも}い出{だ}すことがある。","那一天的气味，现在也会忽然想起来。",[["匂{にお}い","气味"],["ふと","忽然、不经意"]],[["～ことがある","辞书形＋ことがある，「有时会……」。接た形则是「曾经……过」。"]]],
+["どんなに遠{とお}くても、同{おな}じ空{そら}の下{した}にいる。","无论多远，都在同一片天空下。",[["遠{とお}い","远"],["空{そら}","天空"]],[["どんなに～ても","「无论多么……也……」。"]]],
+["夢{ゆめ}の続{つづ}きを見{み}たくて、もう一度{いちど}目{め}を閉{と}じた。","想把梦接着做下去，又闭上了眼。",[["夢{ゆめ}","梦"],["閉{と}じる","闭上"]],[["～たくて","たい的て形，表示原因：「因为想……」。"]]],
+["好{す}きだと気{き}づいたのは{wa}、会{あ}えなくなってからだった。","发现自己喜欢上，是在见不到之后。",[["気{き}づく","察觉"],["会{あ}える","能见到"]],[["～てから","「……之后」。"],["～なくなる","「变得不能……」。"]]],
+["優{やさ}しくされると、かえって泣{な}きそうになる。","被温柔对待，反而快要哭出来。",[["優{やさ}しい","温柔"],["かえって","反而"]],[["～そうになる","ます形＋そうになる，「差点就……」。"]]],
+["明日{あした}のことは{wa}、明日{あした}の自分{じぶん}に任{まか}せよう。","明天的事，就交给明天的自己吧。",[["自分{じぶん}","自己"],["任{まか}せる","交给、托付"]],[["～よう","意志形：「……吧」，对自己说的决定。"]]],
+["雨{あめ}の音{おと}を聞{き}いていると、なぜか落{お}ち着{つ}く。","听着雨声，不知为什么就平静下来。",[["音{おと}","声音"],["落{お}ち着{つ}く","平静、安定"]],[["～ていると","「一直……着，就……」。"],["なぜか","「不知为何」。"]]],
+["触{ふ}れたら消{き}えてしまいそうで、ただ見{み}つめていた。","好像一碰就会消失，所以只是看着。",[["触{ふ}れる","触碰"],["見{み}つめる","凝视"]],[["～てしまいそう","「好像就要……掉了」，てしまう带着可惜。"]]],
+["変{か}わらないものなんてないけれど、変{か}わってほしくないものは{wa}ある。","没有什么是不会变的，但有不希望它变的东西。",[["変{か}わる","改变"],["もの","东西、事物"]],[["～なんて","轻轻带过前面的词：「……这种东西」。"],["～てほしくない","「不希望（别人或事物）……」。"]]],
+["君{きみ}に会{あ}うまで、こんな気持{きも}ちは{wa}知{し}らなかった。","遇见你之前，不知道有这样的心情。",[["気持{きも}ち","心情"],["知{し}る","知道"]],[["～まで","辞书形＋まで，「直到……为止」。"]]],
+["夕焼{ゆうや}けがきれいだと、誰{だれ}かに伝{つた}えたくなる。","晚霞一好看，就想告诉谁。",[["夕焼{ゆうや}け","晚霞"],["伝{つた}える","传达、告诉"]],[["～たくなる","「变得想……」，心情自己冒出来。"]]],
+["大丈夫{だいじょうぶ}じゃないのに、大丈夫{だいじょうぶ}と言{い}ってしまう。","明明不是没事，却还是说了没事。",[["大丈夫{だいじょうぶ}","没事、不要紧"],["言{い}う","说"]],[["～のに","「明明……却……」，带着委屈。"],["～てしまう","不由自主地做了。"]]],
+["時間{じかん}が解決{かいけつ}してくれるなんて、嘘{うそ}だと思{おも}っていた。","时间会解决一切什么的，我以前觉得是骗人的。",[["解決{かいけつ}","解决"],["嘘{うそ}","谎话"]],[["～てくれる","别人或某物为我做：这里是时间替我解决。"]]],
+["眠{ねむ}れない夜{よる}ほど、朝{あさ}が遠{とお}く感{かん}じる。","越是睡不着的夜，越觉得早晨很远。",[["眠{ねむ}る","睡"],["感{かん}じる","感觉"]],[["ねむれない","可能形的否定：睡不着。"]]],
+["手{て}を伸{の}ばせば届{とど}きそうなのに、どうしても届{とど}かない。","好像伸手就能够到，却怎么也够不到。",[["伸{の}ばす","伸出"],["届{とど}く","够到、送达"]],[["～ば","假定：のばす → のばせば。"],["どうしても～ない","「无论如何也不……」。"]]],
+["君{きみ}の声{こえ}を聞{き}いたら、疲{つか}れなんて忘{わす}れてしまった。","一听到你的声音，疲惫什么的就全忘了。",[["声{こえ}","（人的）声音"],["疲{つか}れ","疲劳"]],[["～たら","「一……就……」，后面是没想到的结果。"]]],
+["冬{ふゆ}の朝{あさ}の空気{くうき}は{wa}、冷{つめ}たいけれど嫌{きら}いじゃない。","冬天早晨的空气很冷，但我不讨厌。",[["空気{くうき}","空气"],["嫌{きら}い","讨厌"]],[["きらいじゃない","不直接说喜欢，绕一圈说「不讨厌」，是很日语的含蓄。"]]],
+["終{お}わってほしくない時間{じかん}ほど、早{はや}く過{す}ぎていく。","越是不想结束的时间，过得越快。",[["終{お}わる","结束"],["過{す}ぎる","经过、流逝"]],[["～ていく","从现在往远处去：时间一点点离开。"]]],
+["思{おも}い出{で}は{wa}、思{おも}い出{だ}すたびに少{すこ}しずつ形{かたち}を変{か}える。","回忆每被想起一次，就悄悄变一点形状。",[["思{おも}い出{で}","回忆"],["形{かたち}","形状"]],[["かえる / かわる","かえる是他动词「改变（某物）」，かわる是自动词「（自己）变」。"]]],
+["好{す}きな人{ひと}の好{す}きなものを、いつの間{ま}にか好{す}きになっていた。","喜欢的人喜欢的东西，不知不觉我也喜欢上了。",[["好{す}き","喜欢"],["人{ひと}","人"]],[["いつのまにか","「不知什么时候」。"],["～になっていた","回过神来已经变成那样了。"]]],
+["言{い}えなかった一言{ひとこと}が、今{いま}も胸{むね}に残{のこ}っている。","没能说出口的那一句，现在还留在心里。",[["一言{ひとこと}","一句话"],["今{いま}","现在"]],[["いえなかった","可能形的过去否定：没能说出口。"]]],
+["窓{まど}の外{そと}を眺{なが}めながら、ぼんやりとコーヒーを飲{の}む。","望着窗外，发着呆喝咖啡。",[["眺{なが}める","眺望"],["ぼんやり","发呆、模糊"]],[["～ながら","ます形＋ながら，「一边……一边……」。"]]],
+["迷{まよ}ったら、心{こころ}が動{うご}くほうを選{えら}べばいい。","犹豫的话，就选让心动的那一边。",[["迷{まよ}う","犹豫、迷路"],["選{えら}ぶ","选择"]],[["～ほう","「……的那一方」。"],["～ばいい","「……就好」。"]]],
+["待{ま}っている時間{じかん}さえ、今{いま}は{wa}愛{いと}おしい。","就连等待的时间，现在也觉得珍贵。",[["時間{じかん}","时间"],["愛{いと}おしい","令人怜爱的、珍贵的"]],[["～さえ","「连……都」。"]]],
+["知{し}らない街{まち}を歩{ある}くと、自分{じぶん}が少{すこ}し自由{じゆう}になった気{き}がする。","走在陌生的街上，觉得自己自由了一点。",[["街{まち}","街、城市"],["自由{じゆう}","自由"]],[["～きがする","「感觉好像……」，说的是模糊的感受。"]]],
+["君{きみ}がいない部屋{へや}は{wa}、思{おも}ったより広{ひろ}かった。","你不在的房间，比想象的大。",[["部屋{へや}","房间"],["広{ひろ}い","宽敞"]],[["おもったより","「比想的更……」。"]]],
+["今日{きょう}の空{そら}を、君{きみ}にも見{み}せたかった。","今天的天空，也想让你看看。",[["今日{きょう}","今天"],["見{み}せる","给……看"]],[["～たかった","たい的过去式：「本来想……」，没能做到的遗憾。"]]],
+["強{つよ}がらなくていい。ここでは{wa}誰{だれ}も見{み}ていないから。","不用逞强。这里谁也没在看。",[["強{つよ}がる","逞强"],["誰{だれ}も","（接否定）谁也"]],[["～なくていい","「不用……」。"],["～がる","形容词去い＋がる，「做出……的样子」。"]]],
+["桜{さくら}が散{ち}るのを見{み}ると、少{すこ}しだけ切{せつ}なくなる。","看到樱花落下，会有一点点难过。",[["散{ち}る","（花）落"],["切{せつ}ない","难受、揪心"]],[["～のをみる","の把前面的句子变成名词：看「樱花落下」这件事。"]]],
+["もし生{う}まれ変{か}わっても、また君{きみ}を探{さが}すと思{おも}う。","就算重新出生一次，我想我还是会去找你。",[["生{う}まれ変{か}わる","转世、重生"],["探{さが}す","寻找"]],[["もし～ても","「即使万一……也……」。"]]],
+["黙{だま}って隣{となり}に座{すわ}ってくれる人{ひと}が、一番{いちばん}ありがたい。","什么都不说、坐到身边来的人，最让人感激。",[["黙{だま}る","沉默"],["座{すわ}る","坐"]],[["～てくれるひと","てくれる接名词：「愿意为我……的人」。"]]],
+["夜中{よなか}に目{め}が覚{さ}めて、君{きみ}の寝顔{ねがお}を見{み}て安心{あんしん}した。","半夜醒来，看到你睡着的脸就安心了。",[["目{め}が覚{さ}める","醒来"],["寝顔{ねがお}","睡脸"]],[["～て","て形连着说先后发生的事，也带出原因。"]]],
+["うまく笑{わら}えない日{ひ}があっても、それでいいんだ。","有笑不好的日子，也没关系的。",[["うまく","顺利地、好好地"],["日{ひ}","日子"]],[["～んだ","把话说得更肯定，像在对人或对自己确认。"]]],
+["好{す}きという言葉{ことば}だけでは{wa}、足{た}りない気{き}がする。","只有「喜欢」这个词，总觉得不够。",[["足{た}りる","足够"],["言葉{ことば}","词、话"]],[["～という","「叫作……的」，用来引出一个词。"],["～だけでは{wa}","「光靠……的话（不够）」。"]]],
+["風{かぜ}が冷{つめ}たくなると、誰{だれ}かに会{あ}いたくなる。","风一变冷，就想见谁。",[["風{かぜ}","风"],["誰{だれ}か","某个人"]],[["だれか / だれも","か是「某个」，も接否定是「谁也不」。"]]],
+["小{ちい}さな幸{しあわ}せに気{き}づける人{ひと}でいたい。","想一直做一个能发现小幸福的人。",[["小{ちい}さな","小小的"],["幸{しあわ}せ","幸福"]],[["～でいたい","「想一直保持是……」。"],["きづける","きづく的可能形。"]]],
+["おやすみ。明日{あした}も君{きみ}にいいことがありますように。","晚安。愿你明天也有好事发生。",[["おやすみ","晚安"],["いいこと","好事"]],[["～ますように","ます形＋ように，许愿的说法：「愿……」。"]]]
+];
+</script>
+<script>
+/* [句子, 罗马音(按音节), 中文, [[单词, 罗马音, 释义]...], [[语法, 罗马音, 讲解]...]] */
+const KO_NEW=[
+["보고 싶어요.","bo-go si-peo-yo","想你了。",[["보다","bo-da","看、见"]],[["-고 싶다","-go sip-da","「想做……」。보고 싶다字面是「想见」，就是韩语的「想你」。"]]],
+["오늘도 수고했어요.","o-neul-do su-go-hae-sseo-yo","今天也辛苦了。",[["오늘","o-neul","今天"],["수고하다","su-go-ha-da","辛苦、费心"]],[["도","do","「也」。오늘도＝今天也。"]]],
+["네가 있어서 좋아.","ne-ga i-sseo-seo jo-a","有你在，真好。",[["네가","ne-ga","你（作主语；口语里常读 ni-ga）"],["있다","it-da","在、有"]],[["-아/어서","-a/eo-seo","表示原因。있어서 (i-sseo-seo)＝因为在。"],["반말","ban-mal","去掉句尾的요就是对亲近的人说的平语：좋아요 → 좋아。"]]],
+["같이 있으면 시간이 빨리 가요.","ga-chi i-sseu-myeon si-ga-ni ppal-li ga-yo","在一起的时候，时间过得很快。",[["시간","si-gan","时间"],["빨리","ppal-li","快"]],[["-(으)면","-(eu)-myeon","「如果、一……就……」。"]]],
+["별이 참 예뻐요.","byeo-ri cham ye-ppeo-yo","星星真好看。",[["별","byeol","星星"],["참","cham","真"]],[["예쁘다 → 예뻐요","ye-ppeu-da → ye-ppeo-yo","ㅡ不规则：词干的ㅡ遇到어会脱落。"]]],
+["괜찮아, 천천히 와.","gwaen-cha-na cheon-cheon-hi wa","没关系，慢慢来。",[["천천히","cheon-cheon-hi","慢慢地"],["오다","o-da","来"]],[["오다 → 와","o-da → wa","오＋아 缩成 와。平语的命令和陈述是同一个形式。"]]],
+["네 목소리가 듣고 싶었어.","ne mok-so-ri-ga deut-go si-peo-sseo","想听你的声音了。",[["목소리","mok-so-ri","嗓音"],["듣다","deut-da","听"]],[["-고 싶었어","-go si-peo-sseo","-고 싶다 的过去式平语：「之前一直想……」。"]]],
+["비 오는 날을 좋아해요.","bi o-neun na-reul jo-a-hae-yo","我喜欢下雨的日子。",[["비","bi","雨"],["날","nal","日子"]],[["-는","-neun","动词词干＋는，修饰后面的名词：비 오는 날 (bi o-neun nal)＝下雨的日子。"]]],
+["꿈에서 너를 봤어.","kku-me-seo neo-reul bwa-sseo","在梦里见到你了。",[["꿈","kkum","梦"],["너","neo","你"]],[["에서","e-seo","动作发生的地方：꿈에서 (kku-me-seo)＝在梦里。"]]],
+["마음이 따뜻해져요.","ma-eu-mi tta-tteu-tae-jyeo-yo","心里变得暖暖的。",[["마음","ma-eum","心"],["따뜻하다","tta-tteu-ta-da","温暖"]],[["-아/어지다","-a/eo-ji-da","形容词＋지다，「变得……」。"]]],
+["잘 자요, 좋은 꿈 꿔요.","jal ja-yo jo-eun kkum kkwo-yo","晚安，做个好梦。",[["자다","ja-da","睡"],["꾸다","kku-da","做（梦）"]],[["-(으)ㄴ","-(eu)n","形容词词干＋ㄴ/은 修饰名词：좋은 꿈 (jo-eun kkum)＝好梦。"]]],
+["너만 있으면 돼.","neo-man i-sseu-myeon dwae","只要有你就够了。",[["만","man","只"],["되다","doe-da","行、可以"]],[["-(으)면 되다","-(eu)-myeon doe-da","「只要……就行」。되다 → 돼 (dwae)。"]]],
+["오늘 하늘이 너무 예뻐서 사진을 찍었어요.","o-neul ha-neu-ri neo-mu ye-ppeo-seo sa-ji-neul jji-geo-sseo-yo","今天的天空太好看了，所以拍了照。",[["하늘","ha-neul","天空"],["사진","sa-jin","照片"],["찍다","jjik-da","拍"]],[["-아/어서","-a/eo-seo","原因放前面，结果放后面，时态只写在句尾。"]]],
+["가끔은 쉬어도 돼요.","ga-kkeu-meun swi-eo-do dwae-yo","偶尔休息一下也可以的。",[["가끔","ga-kkeum","偶尔"],["쉬다","swi-da","休息"]],[["-아/어도 되다","-a/eo-do doe-da","「……也可以」，表示许可。"]]],
+["그 말 한마디에 눈물이 났어요.","geu mal han-ma-di-e nun-mu-ri na-sseo-yo","就因为那一句话，眼泪掉下来了。",[["말","mal","话"],["한마디","han-ma-di","一句话"],["눈물","nun-mul","眼泪"]],[["에","e","这里表示原因、契机：한마디에＝因为那一句。"],["눈물이 나다","nun-mu-ri na-da","「流泪」，字面是眼泪出来。"]]],
+["봄이 오면 같이 걸어요.","bo-mi o-myeon ga-chi geo-reo-yo","等春天来了，一起散步吧。",[["봄","bom","春天"],["걷다","geot-da","走路"]],[["걷다 → 걸어요","geot-da → geo-reo-yo","ㄷ不规则：收音ㄷ遇到元音变成ㄹ。"],["-아요/어요","-a-yo / -eo-yo","同一个句尾也能表示「一起……吧」，看语境。"]]],
+["혼자가 아니에요.","hon-ja-ga a-ni-e-yo","你不是一个人。",[["혼자","hon-ja","独自"]],[["이/가 아니에요","i/ga a-ni-e-yo","「不是……」。前面的名词要加이/가。"]]],
+["네 생각이 나서 연락했어.","ne saeng-ga-gi na-seo yeol-la-kae-sseo","想起你了，所以联系你。",[["생각","saeng-gak","想法、念头"],["연락하다","yeol-la-ka-da","联系"]],[["생각이 나다","saeng-ga-gi na-da","「想起来」，念头自己冒出来。"]]],
+["시간이 멈췄으면 좋겠어요.","si-ga-ni meom-chwo-sseu-myeon jo-ke-sseo-yo","要是时间能停下来就好了。",[["멈추다","meom-chu-da","停"]],[["-았/었으면 좋겠다","-a/eo-sseu-myeon jo-ket-da","「要是……就好了」，说愿望。"]]],
+["웃는 얼굴이 제일 예뻐요.","un-neun eol-gu-ri je-il ye-ppeo-yo","笑着的样子最好看。",[["웃다","ut-da","笑"],["얼굴","eol-gul","脸"],["제일","je-il","最"]],[["웃는","un-neun","收音ㅅ遇到ㄴ读成ㄴ，所以不是 ut-neun 而是 un-neun。"]]],
+["기다릴게요.","gi-da-ril-ge-yo","我会等你的。",[["기다리다","gi-da-ri-da","等"]],[["-(으)ㄹ게요","-(eu)l-ge-yo","对对方做出的承诺：「我会……的」。实际读音里 게 会读得像 께。"]]],
+["눈이 오면 네가 생각나.","nu-ni o-myeon ne-ga saeng-gang-na","一下雪，就想起你。",[["눈","nun","雪"],["생각나다","saeng-gang-na-da","想起"]],[["생각나","saeng-gang-na","收音ㄱ遇到ㄴ读成ㅇ：각나 → gang-na。"]]],
+["오늘은 그냥 안아 주세요.","o-neu-reun geu-nyang a-na ju-se-yo","今天就只是抱抱我吧。",[["그냥","geu-nyang","就那样、只是"],["안다","an-da","抱"]],[["-아/어 주세요","-a/eo ju-se-yo","「请为我……」。"]]],
+["밤이 깊었어요.","ba-mi gi-peo-sseo-yo","夜深了。",[["밤","bam","夜晚"],["깊다","gip-da","深"]],[["-았/었어요","-a/eo-sseo-yo","过去式。韩语说夜「已经深了」，用过去式表示变成了现在的状态。"]]],
+["고마워요, 옆에 있어 줘서.","go-ma-wo-yo yeo-pe i-sseo jwo-seo","谢谢你，一直在我身边。",[["고맙다","go-map-da","感谢"],["옆","yeop","旁边"]],[["-아/어 줘서","-a/eo jwo-seo","「因为你为我……」。把原因放到后面说，是口语里很自然的倒装。"]]],
+["바람이 차가워졌어요.","ba-ra-mi cha-ga-wo-jyeo-sseo-yo","风变凉了。",[["바람","ba-ram","风"],["차갑다","cha-gap-da","凉、冰"]],[["ㅂ 不规则","bi-eup","차갑다的ㅂ遇到元音变成우：차가워。再接 -지다 表示变化。"]]],
+["잊고 싶지 않아요.","it-go sip-ji a-na-yo","我不想忘记。",[["잊다","it-da","忘记"]],[["-지 않다","-ji an-ta","否定：「不……」。-고 싶지 않다＝不想……。"]]],
+["너를 만나서 다행이야.","neo-reul man-na-seo da-haeng-i-ya","能遇见你，真是太好了。",[["만나다","man-na-da","遇见"],["다행","da-haeng","万幸"]],[["이야","i-ya","이에요 的平语，名词后的「是」。"]]],
+["마음이 아파요.","ma-eu-mi a-pa-yo","心里难受。",[["아프다","a-peu-da","疼"]],[["아프다 → 아파요","a-peu-da → a-pa-yo","ㅡ不规则：ㅡ脱落，看前一个元音ㅏ，所以接아요。"]]],
+["내일 또 만나요.","nae-il tto man-na-yo","明天再见。",[["내일","nae-il","明天"],["또","tto","又、再"]],[["-아요","-a-yo","만나다的词干以ㅏ结尾，和아合在一起：만나요。"]]],
+["우리 처음 만난 날 기억나요?","u-ri cheo-eum man-nan nal gi-eong-na-yo","还记得我们第一次见面的那天吗？",[["우리","u-ri","我们"],["처음","cheo-eum","第一次"],["기억나다","gi-eong-na-da","记起"]],[["-(으)ㄴ","-(eu)n","动词词干＋ㄴ/은 表示过去的修饰：만난 날 (man-nan nal)＝见面的那天。"]]],
+["달이 밝아서 잠이 안 와요.","da-ri bal-ga-seo ja-mi an wa-yo","月亮太亮了，睡不着。",[["달","dal","月亮"],["밝다","bak-da","明亮"],["잠","jam","睡意、觉"]],[["안","an","放在动词前的否定：안 와요＝不来。잠이 안 오다＝睡意不来，就是睡不着。"]]],
+["힘들면 말해요.","him-deul-myeon mal-hae-yo","累了就说出来。",[["힘들다","him-deul-da","吃力、累"],["말하다","mal-ha-da","说"]],[["-(으)면","-(eu)-myeon","词干以ㄹ结尾时直接接면：힘들면。"]]],
+["지금 이 순간이 좋아요.","ji-geum i sun-ga-ni jo-a-yo","喜欢现在这一刻。",[["지금","ji-geum","现在"],["순간","sun-gan","瞬间"]],[["이 / 그 / 저","i / geu / jeo","这 / 那（离对方近或刚提到的）/ 那（离两人都远的）。"]]],
+["그리워요.","geu-ri-wo-yo","好想念。",[["그립다","geu-rip-da","想念、怀念"]],[["ㅂ 不规则","bi-eup","그립다 → 그리워요。보고 싶다多用于想见某个人，그립다还可以用在地方和过去的时光上。"]]],
+["네 옆에 있을게.","ne yeo-pe i-sseul-ge","我会在你身边。",[["네","ne","你的"]],[["-(으)ㄹ게","-(eu)l-ge","-(으)ㄹ게요 的平语，对亲近的人许下的承诺。"]]],
+["노래를 들으면 그때가 떠올라요.","no-rae-reul deu-reu-myeon geu-ttae-ga tteo-ol-la-yo","一听到歌，就想起那时候。",[["노래","no-rae","歌"],["그때","geu-ttae","那时"],["떠오르다","tteo-o-reu-da","浮现"]],[["듣다 → 들으면","deut-da → deu-reu-myeon","ㄷ不规则。"],["르 不规则","reu","떠오르다 → 떠올라요：르变成ㄹ라。"]]],
+["사랑해요.","sa-rang-hae-yo","我爱你。",[["사랑하다","sa-rang-ha-da","爱"]],[["하다 → 해요","ha-da → hae-yo","所有하다动词的礼貌体都是해요。韩语里主语和宾语在语境清楚时都可以省略。"]]],
+["조금만 더 같이 있어요.","jo-geum-man deo ga-chi i-sseo-yo","再多待一会儿吧。",[["조금","jo-geum","一点"],["더","deo","更、再"]],[["만","man","조금만＝只要一点点，让请求听起来更软。"]]],
+["오늘 하루도 잘 버텼어요.","o-neul ha-ru-do jal beo-tyeo-sseo-yo","今天这一天也好好撑过来了。",[["하루","ha-ru","一天"],["버티다","beo-ti-da","撑住"]],[["버티다 → 버텼어요","beo-ti-da → beo-tyeo-sseo-yo","ㅣ＋었 缩成 였/혔 这一类：티＋었 → 텼。"]]],
+["따뜻한 차 한 잔 어때요?","tta-tteu-tan cha han jan eo-ttae-yo","来一杯热茶怎么样？",[["차","cha","茶"],["잔","jan","杯（量词）"]],[["어때요?","eo-ttae-yo","名词＋어때요，「……怎么样？」，轻松的提议。"]]],
+["네가 웃으면 나도 좋아.","ne-ga u-seu-myeon na-do jo-a","你一笑，我也开心。",[["나","na","我（平语）"]],[["-(으)면","-(eu)-myeon","词干有收音时加으：웃으면 (u-seu-myeon)。"]]],
+["벚꽃이 피면 보러 가요.","beot-kko-chi pi-myeon bo-reo ga-yo","樱花开了就去看吧。",[["벚꽃","beot-kkot","樱花"],["피다","pi-da","（花）开"]],[["-(으)러 가다","-(eu)-reo ga-da","「去做……」，表示去的目的。"]]],
+["아무 말도 안 해도 돼요.","a-mu mal-do an hae-do dwae-yo","什么都不说也可以的。",[["아무","a-mu","任何"]],[["아무 ~도","a-mu ~do","后面接否定：「什么……也不」。"]]],
+["가을이 가는 게 아쉬워요.","ga-eu-ri ga-neun ge a-swi-wo-yo","秋天要走了，有点舍不得。",[["가을","ga-eul","秋天"],["아쉽다","a-swip-da","可惜、舍不得"]],[["-는 게","-neun ge","-는 것이 的缩略，把前面的句子变成名词：秋天走掉「这件事」。"]]],
+["꼭 다시 만나요.","kkok da-si man-na-yo","一定要再见面。",[["꼭","kkok","一定"],["다시","da-si","再次"]],[["또 / 다시","tto / da-si","都有「再」的意思。다시是重新来一次，또是又一次。"]]],
+["네가 행복했으면 좋겠어.","ne-ga haeng-bo-kae-sseu-myeon jo-ke-sseo","希望你能幸福。",[["행복하다","haeng-bo-ka-da","幸福"]],[["-았/었으면 좋겠어","-a/eo-sseu-myeon jo-ke-sseo","用过去形式说的是愿望，不是真的过去。"]]],
+["마음에 들어요.","ma-eu-me deu-reo-yo","很中意，很喜欢。",[["들다","deul-da","进入"]],[["마음에 들다","ma-eu-me deul-da","字面是「进到心里」，用来说看上了、合心意。"]]],
+["별거 아니에요, 그냥 보고 싶어서요.","byeol-geo a-ni-e-yo geu-nyang bo-go si-peo-seo-yo","没什么事，就是想你了。",[["별거","byeol-geo","特别的事"]],[["-아/어서요","-a/eo-seo-yo","只说原因就停住，后半句留给对方去想。"]]],
+["오늘 밤은 달이 참 예쁘네요.","o-neul ba-meun da-ri cham ye-ppeu-ne-yo","今晚的月亮真好看呢。",[["밤","bam","夜晚"]],[["-네요","-ne-yo","刚发现、刚感受到时的轻轻感叹：「……呢」。"]]]
+];
+</script>
+<script>
+/* 日语标记：汉字{读法}；助词は写作 は{wa} */
+const JA=[
+{s:"急{いそ}がなくてもいいから、ゆっくり考{かんが}えてみて。",z:"不用着急，慢慢想想看。",
+ w:[["急{いそ}ぐ","赶、着急"],["ゆっくり","慢慢地"],["考{かんが}える","思考"]],
+ g:[["～なくてもいい","动词ない形去い＋くてもいい，表示「不……也可以」。"],["～てみる","て形＋みる，「试着做……」。这里的みて是口语里省掉ください的轻请求。"]]},
+{s:"雨{あめ}が降{ふ}りそうだから、傘{かさ}を持{も}っていったほうがいいよ。",z:"好像要下雨了，带把伞去比较好哦。",
+ w:[["降{ふ}る","下（雨、雪）"],["傘{かさ}","伞"],["持{も}っていく","带去"]],
+ g:[["～そうだ","表示样态：动词ます形＋そうだ，看样子马上要……。和表示传闻的「降{ふ}るそうだ」不一样。"],["～たほうがいい","た形＋ほうがいい，给建议：「最好……」。"]]},
+{s:"忙{いそが}しいときこそ、ちゃんとご飯{はん}を食{た}べないと。",z:"越是忙的时候，越得好好吃饭。",
+ w:[["忙{いそが}しい","忙"],["ちゃんと","好好地、规规矩矩地"],["ご飯{はん}","饭"]],
+ g:[["こそ","强调前面的词：「正是……」。ときこそ＝正是在……的时候。"],["～ないと","「～ないといけない」的口语省略，「不……不行」。"]]},
+{s:"せっかく来{き}たんだから、もう少{すこ}し歩{ある}いてみようか。",z:"难得来一趟，再走走看吧。",
+ w:[["せっかく","难得、特意"],["もう少{すこ}し","再稍微"],["歩{ある}く","走"]],
+ g:[["せっかく～んだから","「难得……，所以……」，后面接不想浪费这个机会的提议。"],["～てみようか","てみる的意志形＋か，轻轻提议「要不试试……」。"]]},
+{s:"この店{みせ}、いつも混{こ}んでいるわりに、待{ま}ち時間{じかん}は{wa}短{みじか}い。",z:"这家店总是很挤，等的时间倒是不长。",
+ w:[["混{こ}む","拥挤"],["待{ま}ち時間{じかん}","等待时间"],["短{みじか}い","短"]],
+ g:[["～わりに","「虽然……却（比预想的）……」。前后的落差不大不小，是日常口语里很常用的转折。"]]},
+{s:"実験{じっけん}がうまくいかなくても、落{お}ち込{こ}むことは{wa}ない。",z:"就算实验不顺利，也没必要消沉。",
+ w:[["実験{じっけん}","实验"],["うまくいく","进展顺利"],["落{お}ち込{こ}む","消沉、低落"]],
+ g:[["～なくても","ない形＋くても，「即使不……」。"],["～ことは{wa}ない","辞书形＋ことはない，「没必要……」，常用来安慰人。"]]},
+{s:"電車{でんしゃ}が遅{おく}れたせいで、会議{かいぎ}に間{ま}に合{あ}わなかった。",z:"都怪电车晚点，没赶上会议。",
+ w:[["遅{おく}れる","迟、晚点"],["会議{かいぎ}","会议"],["間{ま}に合{あ}う","赶得上"]],
+ g:[["～せいで","表示不好结果的原因，「都怪……」。好结果用「おかげで」。"]]},
+{s:"窓{まど}を開{あ}けたとたん、冷{つめ}たい風{かぜ}が入{はい}ってきた。",z:"刚一打开窗，冷风就吹了进来。",
+ w:[["窓{まど}","窗"],["開{あ}ける","打开"],["冷{つめ}たい","冰凉的"]],
+ g:[["～たとたん","た形＋とたん，「刚……就……」，后面是没预料到的事。"],["～てくる","动作朝说话人这边来：「入{はい}ってくる」＝进来。"]]},
+{s:"言{い}われてみれば、確{たし}かにそうかもしれない。",z:"被你这么一说，好像确实是这样。",
+ w:[["言{い}われる","被说（言う的被动）"],["確{たし}かに","确实"]],
+ g:[["～てみれば","「试着……的话」。「言{い}われてみれば」是固定说法：经你一说才发现。"],["～かもしれない","「也许……」，不太确定的推测。"]]},
+{s:"疲{つか}れているなら、無理{むり}しないで早{はや}く寝{ね}たら？",z:"累了的话，别硬撑，早点睡吧？",
+ w:[["疲{つか}れる","累"],["無理{むり}する","勉强、硬撑"],["寝{ね}る","睡"]],
+ g:[["～なら","接着对方的情况说：「如果是……的话」。"],["～たら？","「～たらどう？」的省略，亲近的人之间的建议。"]]},
+{s:"知{し}れば知{し}るほど、この街{まち}が好{す}きになる。",z:"越了解，越喜欢这座城市。",
+ w:[["知{し}る","知道、了解"],["街{まち}","街、城市"]],
+ g:[["～ば～ほど","同一个词的ば形＋辞书形＋ほど，「越……越……」。"],["～になる","「变得……」。「好{す}きになる」＝喜欢上。"]]},
+{s:"忘{わす}れないうちに、メモしておこう。",z:"趁还没忘，先记下来吧。",
+ w:[["忘{わす}れる","忘记"],["メモする","记笔记"]],
+ g:[["～ないうちに","「趁还没……」。"],["～ておく","て形＋おく，为了之后方便「先做好」。おこう是意志形。"]]},
+{s:"彼女{かのじょ}は{wa}何{なに}も言{い}わずに、ただ笑{わら}っていた。",z:"她什么也没说，只是笑着。",
+ w:[["何{なに}も","（接否定）什么也"],["ただ","只是"],["笑{わら}う","笑"]],
+ g:[["～ずに","「～ないで」的书面一点的说法：「不……就……」。する变成せずに。"]]},
+{s:"今日{きょう}は{wa}もう帰{かえ}ることにした。続{つづ}きは{wa}明日{あした}やればいい。",z:"今天决定先回去了。剩下的明天做就行。",
+ w:[["帰{かえ}る","回去"],["続{つづ}き","后续、接下来的部分"]],
+ g:[["～ことにする","自己做的决定：「决定……」。别人或情况决定的用「ことになる」。"],["～ばいい","「……就行了」。"]]}
+];
+/* 韩语：r 按音节用 - 或空格分开，和韩文字一一对应 */
+const KO=[
+{s:"오늘 날씨가 정말 좋아요.",r:"o-neul nal-ssi-ga jeong-mal jo-a-yo",z:"今天天气真好。",
+ w:[["오늘","o-neul","今天"],["날씨","nal-ssi","天气"],["정말","jeong-mal","真的"],["좋다","jo-ta","好"]],
+ g:[["이/가","i / ga","主语助词。前面的字有收音用이，没有用가：날씨가 (nal-ssi-ga)。"],["-아요/어요","-ayo / -eoyo","最常用的礼貌句尾。词干最后的元音是ㅏ或ㅗ用아요：좋다 → 좋아요 (jo-a-yo)。"]]},
+{s:"저는 커피를 마시고 싶어요.",r:"jeo-neun keo-pi-reul ma-si-go si-peo-yo",z:"我想喝咖啡。",
+ w:[["저","jeo","我（谦称）"],["커피","keo-pi","咖啡"],["마시다","ma-si-da","喝"]],
+ g:[["은/는 · 을/를","eun / neun · eul / reul","는是话题助词，를是宾语助词。有收音分别用은、을。"],["-고 싶다","-go sip-da","词干＋고 싶다，「想做……」。"]]},
+{s:"천천히 해도 괜찮아요.",r:"cheon-cheon-hi hae-do gwaen-cha-na-yo",z:"慢慢来也没关系。",
+ w:[["천천히","cheon-cheon-hi","慢慢地"],["하다","ha-da","做"],["괜찮다","gwaen-chan-ta","没关系"]],
+ g:[["-아/어도 괜찮다","-a/eo-do gwaen-chan-ta","「即使……也可以」。하다 → 해도 (hae-do)。"]]},
+{s:"주말에 뭐 할 거예요?",r:"ju-ma-re mwo hal geo-ye-yo",z:"周末打算做什么？",
+ w:[["주말","ju-mal","周末"],["뭐","mwo","什么（무엇的口语）"]],
+ g:[["에","e","时间后面的助词：주말에 (ju-ma-re)＝在周末。"],["-(으)ㄹ 거예요","-(eu)l geo-ye-yo","将来或打算。하다 → 할 거예요 (hal geo-ye-yo)。"]]},
+{s:"배가 고파서 라면을 먹었어요.",r:"bae-ga go-pa-seo ra-myeo-neul meo-geo-sseo-yo",z:"肚子饿了，所以吃了拉面。",
+ w:[["배","bae","肚子"],["고프다","go-peu-da","饿"],["라면","ra-myeon","拉面"],["먹다","meok-da","吃"]],
+ g:[["-아/어서","-a/eo-seo","表示原因。고프다的ㅡ脱落 → 고파서 (go-pa-seo)。"],["-았/었어요","-a/eo-sseo-yo","过去式。먹다 → 먹었어요 (meo-geo-sseo-yo)。"]]},
+{s:"한국어를 조금 할 수 있어요.",r:"han-gu-geo-reul jo-geum hal su i-sseo-yo",z:"我会说一点韩语。",
+ w:[["한국어","han-gu-geo","韩语"],["조금","jo-geum","一点"]],
+ g:[["-(으)ㄹ 수 있다","-(eu)l su it-da","「能、会……」。否定是 -(으)ㄹ 수 없다 (su eop-da)。"]]},
+{s:"지금 집에 가고 있어요.",r:"ji-geum ji-be ga-go i-sseo-yo",z:"我现在正在回家。",
+ w:[["지금","ji-geum","现在"],["집","jip","家"],["가다","ga-da","去"]],
+ g:[["에","e","接在地点后表示去的方向：집에 가다 (ji-be ga-da)。"],["-고 있다","-go it-da","正在进行：「正在……」。"]]},
+{s:"비가 오면 집에서 쉴 거예요.",r:"bi-ga o-myeon ji-be-seo swil geo-ye-yo",z:"下雨的话就在家休息。",
+ w:[["비","bi","雨"],["오다","o-da","来（비가 오다＝下雨）"],["쉬다","swi-da","休息"]],
+ g:[["-(으)면","-(eu)-myeon","「如果……」。"],["에서","e-seo","动作发生的地点：집에서 쉬다 (ji-be-seo swi-da)。和表示方向的에区分开。"]]},
+{s:"이 책은 어렵지만 재미있어요.",r:"i chae-geun eo-ryeop-ji-man jae-mi-i-sseo-yo",z:"这本书虽然难，但是有意思。",
+ w:[["책","chaek","书"],["어렵다","eo-ryeop-da","难"],["재미있다","jae-mi-it-da","有趣"]],
+ g:[["-지만","-ji-man","词干＋지만，「虽然……但是……」。"]]},
+{s:"잠깐만 기다려 주세요.",r:"jam-kkan-man gi-da-ryeo ju-se-yo",z:"请稍等一下。",
+ w:[["잠깐","jam-kkan","一会儿"],["만","man","只"],["기다리다","gi-da-ri-da","等"]],
+ g:[["-아/어 주세요","-a/eo ju-se-yo","「请（为我）……」。기다리다 → 기다려 주세요 (gi-da-ryeo ju-se-yo)。"]]},
+{s:"어제는 너무 피곤해서 일찍 잤어요.",r:"eo-je-neun neo-mu pi-gon-hae-seo il-jjik ja-sseo-yo",z:"昨天太累了，所以早早睡了。",
+ w:[["어제","eo-je","昨天"],["너무","neo-mu","太"],["피곤하다","pi-gon-ha-da","累"],["일찍","il-jjik","早"],["자다","ja-da","睡"]],
+ g:[["-아/어서","-a/eo-seo","原因。注意它前面不加过去式：피곤했어서 ✗，피곤해서 (pi-gon-hae-seo) ✓。时态只在句尾表示。"]]},
+{s:"같이 밥 먹으러 갈까요?",r:"ga-chi bap meo-geu-reo gal-kka-yo",z:"要不要一起去吃饭？",
+ w:[["같이","ga-chi","一起"],["밥","bap","饭"]],
+ g:[["-(으)러 가다","-(eu)-reo ga-da","「去做……」，表示去的目的。"],["-(으)ㄹ까요?","-(eu)l-kka-yo","提议或征求意见：「要不要……？」"]]},
+{s:"매일 조금씩 공부하려고 해요.",r:"mae-il jo-geum-ssik gong-bu-ha-ryeo-go hae-yo",z:"我打算每天学一点点。",
+ w:[["매일","mae-il","每天"],["조금씩","jo-geum-ssik","一点一点地"],["공부하다","gong-bu-ha-da","学习"]],
+ g:[["-(으)려고 하다","-(eu)-ryeo-go ha-da","「打算……」。"],["씩","ssik","接在数量后面，表示「每次……」「各……」。"]]},
+{s:"걱정하지 마세요. 다 잘될 거예요.",r:"geok-jeong-ha-ji ma-se-yo da jal-doel geo-ye-yo",z:"别担心，一切都会好的。",
+ w:[["걱정하다","geok-jeong-ha-da","担心"],["다","da","全部"],["잘되다","jal-doe-da","顺利"]],
+ g:[["-지 마세요","-ji ma-se-yo","「请不要……」。"],["-(으)ㄹ 거예요","-(eu)l geo-ye-yo","除了打算，也表示推测：「会……的」。"]]}
+];
+
+/* 新句子排在前面，最早的 14 句留在后面 */
+JA.unshift(...JA_NEW.map(e=>({s:e[0],z:e[1],w:e[2],g:e[3]})));
+KO.unshift(...KO_NEW.map(e=>({s:e[0],r:e[1],z:e[2],w:e[3],g:e[4]})));
+
+const T={};
+("あa いi うu えe おo かka きki くku けke こko さsa しshi すsu せse そso たta ちchi つtsu てte とto なna にni ぬnu ねne のno はha ひhi ふfu へhe ほho まma みmi むmu めme もmo やya ゆyu よyo らra りri るru れre ろro わwa をo んn がga ぎgi ぐgu げge ごgo ざza じji ずzu ぜze ぞzo だda ぢji づzu でde どdo ばba びbi ぶbu べbe ぼbo ぱpa ぴpi ぷpu ぺpe ぽpo")
+ .split(" ").forEach(p=>T[p[0]]=p.slice(1));
+const SMALL="ゃゅょ";
+function hira(c){const n=c.charCodeAt(0);return n>=0x30A1&&n<=0x30F6?String.fromCharCode(n-0x60):c}
+function roma(s){
+  let o="",dbl=false;
+  for(let i=0;i<s.length;i++){
+    const c=hira(s[i]);
+    if(c==="っ"){dbl=true;continue}
+    if(c==="ー"){o+=o.slice(-1);continue}
+    let r=T[c]; if(r===undefined){o+=c;continue}
+    const n=s[i+1]?hira(s[i+1]):"", k=n?SMALL.indexOf(n):-1;
+    if(k>=0){const v="auo"[k]; r=/^(sh|ch|j)i$/.test(r)?r.slice(0,-1)+v:r.slice(0,-1)+"y"+v; i++}
+    if(dbl){r=(r.startsWith("ch")?"t":r[0])+r;dbl=false}
+    o+=r;
+  }
+  return o;
+}
+const esc=t=>t.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const tk=(base,k,ro)=>`<span class="tk"><i class="k">${esc(k)}</i><b>${esc(base)}</b><i class="ro">${esc(ro)}</i></span>`;
+const JRE=/([一-龯々]+)\{([^}]*)\}|(は)\{wa\}|([っッ]?[ぁ-ゖァ-ヺ][ゃゅょャュョ]?ー?)|([\s\S])/gu;
+function jaTok(m){
+  let h="",x; JRE.lastIndex=0;
+  while((x=JRE.exec(m))){
+    if(x[1])h+=tk(x[1],x[2],roma(x[2]));
+    else if(x[3])h+=tk("は","","wa");
+    else if(x[4])h+=tk(x[4],"",roma(x[4]));
+    else h+=tk(x[5],"","");
+  }
+  return h;
+}
+const plain=m=>m.replace(/\{[^}]*\}/g,"");
+const rubyize=t=>esc(t).replace(/([一-龯々]+)\{([^}]+)\}/gu,"<ruby>$1<rt>$2</rt></ruby>").replace(/は\{wa\}/g,"は");
+function koTok(s,r){
+  const syl=r.split(/[\s-]+/); let i=0,h="";
+  for(const c of s){
+    if(c>="가"&&c<="힣")h+=tk(c,"",syl[i++]||"");
+    else if(c===" ")h+='<span class="gap"></span>';
+    else h+=tk(c,"","");
+  }
+  return h;
+}
+function card(e,ko){
+  const voice=ko?"ko-KR":"ja-JP", text=ko?e.s:plain(e.s);
+  const sent=ko?koTok(e.s,e.r):jaTok(e.s);
+  const w=e.w.map(x=>ko
+    ?`<dt><span class="sent sm">${koTok(x[0],x[1])}</span></dt><dd>${esc(x[2])}</dd>`
+    :`<dt><span class="sent sm">${jaTok(x[0])}</span></dt><dd>${esc(x[1])}</dd>`).join("");
+  const g=e.g.map(x=>ko
+    ?`<div class="item"><div><b>${esc(x[0])}</b>　<i class="kr">${esc(x[1])}</i></div><p>${esc(x[2])}</p></div>`
+    :`<div class="item"><span class="sent sm">${jaTok(x[0])}</span><p>${rubyize(x[1])}</p></div>`).join("");
+  return `<section class="${ko?"ko":"ja"}">
+  <div class="lang">${ko?"한국어":"日本語"}</div>
+  <p class="sent" lang="${voice}">${sent}</p>
+  <div class="row"><button data-say="${voice}" data-text="${esc(text)}">朗读</button><button data-tr>看中文</button><span class="note" role="status"></span></div>
+  <p class="zh" hidden>${esc(e.z)}</p>
+  <h2>单词</h2><dl class="words">${w}</dl>
+  <h2>语法</h2><div class="gram">${g}</div>
+</section>`;
+}
+
+/* 朗读：必须挑到对应语言的语音才读，否则直接说明原因，不让别的语音乱读 */
+function voices(){
+  return new Promise(res=>{
+    if(!("speechSynthesis" in window))return res(null);
+    const v=speechSynthesis.getVoices(); if(v.length)return res(v);
+    let done=false; const fin=()=>{if(!done){done=true;res(speechSynthesis.getVoices())}};
+    speechSynthesis.addEventListener("voiceschanged",fin,{once:true}); setTimeout(fin,1200);
+  });
+}
+async function say(btn){
+  const note=btn.parentElement.querySelector(".note"), lang=btn.dataset.say, code=lang.slice(0,2), name=code==="ja"?"日语":"韩语";
+  note.textContent="";
+  const vs=await voices();
+  if(vs===null){note.textContent="这个浏览器不支持朗读。";return}
+  const fit=vs.filter(v=>v.lang.replace("_","-").toLowerCase().startsWith(code));
+  if(!fit.length){note.textContent=vs.length?`这台设备没有装${name}语音，所以读不出来。在系统的语音设置里添加${name}后再点。`:"这里拿不到系统语音，朗读用不了。";return}
+  const v=fit.find(x=>x.localService)||fit[0];
+  try{
+    const u=new SpeechSynthesisUtterance(btn.dataset.text);
+    u.voice=v; u.lang=v.lang; u.rate=.85;
+    u.onerror=()=>{note.textContent="朗读被浏览器拦下了。"};
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }catch(e){note.textContent="朗读被浏览器拦下了。"}
+}
+
+const DAY=86400000, WD="日一二三四五六";
+const today=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate())};
+const dayNo=d=>Math.round(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/DAY);
+const key=d=>d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
+let offset=0;
+function load(){try{return JSON.parse(localStorage.getItem("ikku-done")||"[]")}catch(e){return window._mem||[]}}
+function save(a){window._mem=a;try{localStorage.setItem("ikku-done",JSON.stringify(a))}catch(e){}}
+function streak(a){let n=0,d=today();if(!a.includes(key(d)))d=new Date(d.getFullYear(),d.getMonth(),d.getDate()-1);while(a.includes(key(d))){n++;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()-1)}return n}
+function render(){
+  const t=today(), d=new Date(t.getFullYear(),t.getMonth(),t.getDate()+offset), n=dayNo(d);
+  document.getElementById("date").textContent=`${d.getMonth()+1}月${d.getDate()}日 周${WD[d.getDay()]}`+(offset===0?" · 今天":"");
+  document.getElementById("next").disabled=offset>=0;
+  const m=(x,l)=>((x%l)+l)%l;
+  document.getElementById("cards").innerHTML=card(JA[m(n,JA.length)],false)+card(KO[m(n,KO.length)],true);
+  const a=load(), done=a.includes(key(t)), s=streak(a), b=document.getElementById("mark");
+  b.textContent=done?"今天读完了 ✓":"今天读完了"; b.className=done?"done":"";
+  document.getElementById("streak").textContent=s?`已经连续 ${s} 天`:"读完今天这两句，点一下右边";
+}
+document.getElementById("prev").onclick=()=>{offset--;render()};
+document.getElementById("next").onclick=()=>{if(offset<0){offset++;render()}};
+document.getElementById("mark").onclick=()=>{const a=load(),k=key(today());if(!a.includes(k)){a.push(k);save(a.slice(-400))}render()};
+document.getElementById("cards").addEventListener("click",ev=>{
+  const b=ev.target.closest("button"); if(!b)return;
+  if(b.hasAttribute("data-tr")){const z=b.closest("section").querySelector(".zh");z.hidden=!z.hidden;b.textContent=z.hidden?"看中文":"收起中文"}
+  else if(b.dataset.say)say(b);
+});
+render();
+</script>
+</body>
+</html>
