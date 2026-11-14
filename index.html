@@ -46,6 +46,12 @@ section{background:var(--surface);border:1px solid var(--line);border-radius:10p
 .sm{gap:6px 2px}
 .sm .tk b{font-size:17px}
 .gap{width:10px}
+.pitch{display:inline-flex;align-items:flex-end;margin-left:12px;font-size:13px;color:var(--muted);white-space:nowrap}
+.pitch i{font-style:normal;padding:2px 1px 0;border-top:2px solid transparent;border-right:2px solid transparent}
+.pitch i.hi{border-top-color:var(--accent);color:var(--ink)}
+.pitch i.drop{border-right-color:var(--accent)}
+.pitch sup{margin-left:4px;font-size:11px;color:var(--accent)}
+.words dt{display:flex;align-items:flex-end;flex-wrap:wrap;gap:4px 0}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .note{font-size:13px;color:var(--muted)}
 .zh{margin:0;padding:10px 14px;border-left:3px solid var(--accent);background:var(--bg);border-radius:0 6px 6px 0}
@@ -76,9 +82,13 @@ footer{display:flex;flex-direction:column;gap:12px;color:var(--muted);font-size:
 <div id="cards" style="display:flex;flex-direction:column;gap:20px"></div>
 <footer>
   <div class="foot"><span id="streak"></span><button id="mark">今天读完了</button></div>
-  <span>注音说明：日语上面是假名，下面是罗马音；助词は读 wa、を读 o。韩语的罗马音按实际读音标，前一个字的收音会连到后一个字上，比如 먹었어요 读作 meo-geo-sseo-yo。</span>
+  <span>注音说明：日语上面是假名，下面是罗马音；助词は读 wa、を读 o。日语单词后面带线的假名是声调（东京标准音）：上面有横线的拍读高，竖线处音高落下，数字是落下的位置，0 表示不落下；数据来自 Kanjium 声调词典。韩语的标准音没有声调，所以不标。韩语的罗马音按实际读音标，前一个字的收音会连到后一个字上，比如 먹었어요 读作 meo-geo-sseo-yo。</span>
 </footer>
 </main>
+<script>
+/* 声调核位置（东京式），数据来自 Kanjium 声调词典，CC BY-SA 4.0 */
+const ACC={"急ぐ":2,"考える":4,"降る":1,"傘":1,"忙しい":4,"ご飯":1,"もう少し":4,"歩く":2,"混む":1,"待ち時間":3,"短い":3,"実験":0,"落ち込む":0,"遅れる":0,"会議":1,"間に合う":3,"窓":1,"開ける":0,"冷たい":0,"疲れる":3,"寝る":0,"知る":0,"街":2,"忘れる":0,"何も":0,"笑う":0,"帰る":1,"続き":0,"会う":1,"呼ぶ":0,"胸":2,"君":0,"雪":2,"静か":1,"言葉":3,"残る":2,"話す":2,"隣":0,"上手":3,"待つ":1,"少しずつ":4,"悪い":2,"帰り道":3,"月":2,"早い":2,"一人":2,"寂しい":3,"泣く":0,"匂い":2,"遠い":0,"空":1,"夢":2,"閉じる":2,"気づく":2,"優しい":0,"自分":0,"任せる":3,"音":2,"落ち着く":0,"触れる":0,"見つめる":0,"変わる":0,"気持ち":0,"夕焼け":0,"伝える":0,"大丈夫":3,"言う":0,"解決":0,"嘘":1,"眠る":0,"感じる":0,"伸ばす":2,"届く":2,"声":1,"疲れ":3,"空気":1,"嫌い":0,"終わる":0,"過ぎる":2,"思い出":0,"形":0,"好き":2,"人":0,"一言":2,"今":1,"眺める":3,"迷う":2,"選ぶ":2,"時間":0,"愛おしい":4,"自由":2,"部屋":2,"広い":2,"今日":1,"見せる":2,"強がる":3,"誰も":0,"散る":0,"切ない":3,"生まれ変わる":5,"探す":0,"黙る":2,"座る":0,"寝顔":0,"日":0,"足りる":0,"風":0,"誰か":1,"小さな":1,"幸せ":0,"せっかく":0,"ただ":1,"きっと":0,"だんだん":0,"とき":2,"ふと":1,"かえって":1,"もの":2,"うまく":1,"おやすみ":0};
+</script>
 <script>
 /* [句子, 中文, [[单词, 释义]...], [[语法, 讲解]...]]  汉字{读法}；助词は写作 は{wa} */
 const JA_NEW=[
@@ -317,6 +327,13 @@ function jaTok(m){
   }
   return h;
 }
+const kanaOf=m=>m.replace(/[一-龯々]+\{([^}]*)\}/gu,"$1").replace(/は\{wa\}/g,"は");
+function pitch(m){
+  const n=ACC[m.replace(/\{[^}]*\}/g,"")]; if(n===undefined)return "";
+  const mo=[]; for(const c of kanaOf(m)){ if("ゃゅょぁぃぅぇぉゎャュョァィゥェォ".includes(c)&&mo.length)mo[mo.length-1]+=c; else mo.push(c) }
+  const hi=i=>n===0?i>0:n===1?i===0:(i>0&&i<n);
+  return `<span class="pitch" title="声调型 ${n}">`+mo.map((x,i)=>`<i class="${hi(i)?"hi":""}${n>0&&i===n-1?" drop":""}">${esc(x)}</i>`).join("")+`<sup>${n}</sup></span>`;
+}
 const plain=m=>m.replace(/\{[^}]*\}/g,"");
 const rubyize=t=>esc(t).replace(/([一-龯々]+)\{([^}]+)\}/gu,"<ruby>$1<rt>$2</rt></ruby>").replace(/は\{wa\}/g,"は");
 function koTok(s,r){
@@ -333,7 +350,7 @@ function card(e,ko){
   const sent=ko?koTok(e.s,e.r):jaTok(e.s);
   const w=e.w.map(x=>ko
     ?`<dt><span class="sent sm">${koTok(x[0],x[1])}</span></dt><dd>${esc(x[2])}</dd>`
-    :`<dt><span class="sent sm">${jaTok(x[0])}</span></dt><dd>${esc(x[1])}</dd>`).join("");
+    :`<dt><span class="sent sm">${jaTok(x[0])}</span>${pitch(x[0])}</dt><dd>${esc(x[1])}</dd>`).join("");
   const g=e.g.map(x=>ko
     ?`<div class="item"><div><b>${esc(x[0])}</b>　<i class="kr">${esc(x[1])}</i></div><p>${esc(x[2])}</p></div>`
     :`<div class="item"><span class="sent sm">${jaTok(x[0])}</span><p>${rubyize(x[1])}</p></div>`).join("");
